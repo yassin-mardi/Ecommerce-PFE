@@ -26,66 +26,22 @@ export interface Category {
   image: string
 }
 
-export interface Customer {
+export interface Address {
   id: string
-  name: string
-  email: string
-  phone?: string
-  address?: string
-  city?: string
-  state?: string
-  zipCode?: string
-  country?: string
-  totalOrders: number
-  totalSpent: number
-  createdAt: string
+  street: string
+  city: string
+  postalCode: string
+  country: string
 }
 
-// Initial customers data
-const initialCustomers: Customer[] = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "555-123-4567",
-    address: "123 Main St",
-    city: "New York",
-    state: "NY",
-    zipCode: "10001",
-    country: "USA",
-    totalOrders: 5,
-    totalSpent: 599.95,
-    createdAt: "2023-01-15",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "jane.smith@example.com",
-    phone: "555-987-6543",
-    address: "456 Oak Ave",
-    city: "Los Angeles",
-    state: "CA",
-    zipCode: "90001",
-    country: "USA",
-    totalOrders: 3,
-    totalSpent: 299.97,
-    createdAt: "2023-02-20",
-  },
-  {
-    id: "3",
-    name: "Bob Johnson",
-    email: "bob.johnson@example.com",
-    phone: "555-456-7890",
-    address: "789 Pine St",
-    city: "Chicago",
-    state: "IL",
-    zipCode: "60007",
-    country: "USA",
-    totalOrders: 2,
-    totalSpent: 199.98,
-    createdAt: "2023-03-10",
-  },
-]
+export interface Customer {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  adresses: Address[]
+}
 
 interface DataContextType {
   products: Product[]
@@ -97,26 +53,59 @@ interface DataContextType {
   addCategory: (category: Omit<Category, "id">) => Promise<Category>
   updateCategory: (id: string, category: Partial<Category>) => Promise<Category>
   deleteCategory: (id: string) => Promise<void>
-  addCustomer: (customer: Omit<Customer, "id" | "createdAt" | "totalOrders" | "totalSpent">) => Promise<Customer>
+  addCustomer: (customer: Omit<Customer, "id">) => Promise<Customer>
   updateCustomer: (id: string, customer: Partial<Customer>) => Promise<Customer>
   deleteCustomer: (id: string) => Promise<void>
   searchProducts: (query: string) => Product[]
   searchCategories: (query: string) => Category[]
-  searchCustomers: (query: string) => Customer[]
+  searchCustomers: (query: string) => Promise<Customer[]>
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined)
+
+// Add API base URL from environment variable
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8881'
+
+// Simple fetch configuration
+const fetchConfig = {
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+}
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Load data from localStorage on client side
+  // Fetch customers from API
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/customers`, fetchConfig)
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch customers: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        setCustomers(data)
+      } catch (error) {
+        console.error('Error fetching customers:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchCustomers()
+  }, [])
+
+  // Load products and categories from localStorage
   useEffect(() => {
     const storedProducts = localStorage.getItem("admin_products")
     const storedCategories = localStorage.getItem("admin_categories")
-    const storedCustomers = localStorage.getItem("admin_customers")
 
     if (storedProducts) {
       try {
@@ -139,20 +128,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } else {
       setCategories(initialCategories)
     }
-
-    if (storedCustomers) {
-      try {
-        setCustomers(JSON.parse(storedCustomers))
-      } catch (error) {
-        console.error("Failed to parse customers from localStorage:", error)
-        setCustomers(initialCustomers)
-      }
-    } else {
-      setCustomers(initialCustomers)
-    }
   }, [])
 
-  // Update localStorage when data changes
+  // Update localStorage for products and categories
   useEffect(() => {
     if (products.length > 0) {
       localStorage.setItem("admin_products", JSON.stringify(products))
@@ -160,10 +138,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (categories.length > 0) {
       localStorage.setItem("admin_categories", JSON.stringify(categories))
     }
-    if (customers.length > 0) {
-      localStorage.setItem("admin_customers", JSON.stringify(customers))
-    }
-  }, [products, categories, customers])
+  }, [products, categories])
 
   // Product CRUD operations
   const addProduct = async (product: Omit<Product, "id">): Promise<Product> => {
@@ -253,53 +228,75 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setCategories((prev) => prev.filter((c) => c.id !== id))
   }
 
-  // Customer CRUD operations
-  const addCustomer = async (
-    customer: Omit<Customer, "id" | "createdAt" | "totalOrders" | "totalSpent">,
-  ): Promise<Customer> => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    const newCustomer: Customer = {
-      ...customer,
-      id: Math.random().toString(36).substring(2, 9),
-      totalOrders: 0,
-      totalSpent: 0,
-      createdAt: new Date().toISOString().split("T")[0], // Current date in YYYY-MM-DD format
+  // Customer CRUD operations with API integration
+  const addCustomer = async (customer: Omit<Customer, "id">): Promise<Customer> => {
+    const customerDTO = {
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      email: customer.email,
+      phone: customer.phone,
+      adresses: customer.adresses.map(address => ({
+        street: address.street,
+        city: address.city,
+        postalCode: address.postalCode,
+        country: address.country
+      }))
     }
 
-    setCustomers((prev) => [...prev, newCustomer])
-    return newCustomer
+    console.log('Sending customer data:', customerDTO);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/customers`, {
+        ...fetchConfig,
+        method: 'POST',
+        body: JSON.stringify(customerDTO),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Server response:', errorData);
+        throw new Error(`Failed to add customer: ${response.status} ${response.statusText}. ${errorData}`);
+      }
+
+      const newCustomer = await response.json();
+      console.log('Received new customer:', newCustomer);
+      setCustomers(prev => [...prev, newCustomer]);
+      return newCustomer;
+    } catch (error) {
+      console.error('Error in addCustomer:', error);
+      throw error;
+    }
   }
 
   const updateCustomer = async (id: string, customer: Partial<Customer>): Promise<Customer> => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    const response = await fetch(`${API_BASE_URL}/customers`, {
+      ...fetchConfig,
+      method: 'PUT',
+      body: JSON.stringify({ ...customer, id }),
+    })
 
-    let updatedCustomer: Customer | undefined
-
-    setCustomers((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          updatedCustomer = { ...c, ...customer }
-          return updatedCustomer
-        }
-        return c
-      }),
-    )
-
-    if (!updatedCustomer) {
-      throw new Error("Customer not found")
+    if (!response.ok) {
+      throw new Error('Failed to update customer')
     }
 
+    const updatedCustomer = await response.json()
+    setCustomers(prev =>
+      prev.map(c => c.id === id ? updatedCustomer : c)
+    )
     return updatedCustomer
   }
 
   const deleteCustomer = async (id: string): Promise<void> => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    const response = await fetch(`${API_BASE_URL}/customers/${id}`, {
+      ...fetchConfig,
+      method: 'DELETE',
+    })
 
-    setCustomers((prev) => prev.filter((c) => c.id !== id))
+    if (!response.ok) {
+      throw new Error('Failed to delete customer')
+    }
+
+    setCustomers(prev => prev.filter(c => c.id !== id))
   }
 
   // Search functions
@@ -325,18 +322,30 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     )
   }
 
-  const searchCustomers = (query: string): Customer[] => {
+  // Enhanced search function to use API
+  const searchCustomers = async (query: string): Promise<Customer[]> => {
     if (!query) return customers
 
-    const lowerQuery = query.toLowerCase()
-    return customers.filter(
-      (customer) =>
-        customer.name.toLowerCase().includes(lowerQuery) ||
-        customer.email.toLowerCase().includes(lowerQuery) ||
-        (customer.phone && customer.phone.includes(lowerQuery)) ||
-        (customer.address && customer.address.toLowerCase().includes(lowerQuery)) ||
-        (customer.city && customer.city.toLowerCase().includes(lowerQuery)),
-    )
+    try {
+      const response = await fetch(`${API_BASE_URL}/${query}`, fetchConfig)
+
+      if (!response.ok) {
+        throw new Error('Failed to search customers')
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Error searching customers:', error)
+      // Fallback to local search
+      const lowerQuery = query.toLowerCase()
+      return customers.filter(
+        (customer) =>
+          `${customer.firstName} ${customer.lastName}`.toLowerCase().includes(lowerQuery) ||
+          customer.email.toLowerCase().includes(lowerQuery) ||
+          (customer.phone && customer.phone.includes(lowerQuery)) ||
+          (customer.adresses && customer.adresses.some(address => address.city.toLowerCase().includes(lowerQuery)))
+      )
+    }
   }
 
   return (

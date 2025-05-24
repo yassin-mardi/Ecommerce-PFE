@@ -42,7 +42,8 @@ export function QuickCreateForms() {
 
   // Customer form state
   const [customerForm, setCustomerForm] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     phone: "",
   })
@@ -151,17 +152,15 @@ export function QuickCreateForms() {
 
     try {
       await addCustomer({
-        name: customerForm.name,
+        firstName: customerForm.firstName,
+        lastName: customerForm.lastName,
         email: customerForm.email,
         phone: customerForm.phone,
-        address: "",
-        city: "",
-        state: "",
-        zipCode: "",
-        country: "USA",
+        adresses: []
       })
       setCustomerForm({
-        name: "",
+        firstName: "",
+        lastName: "",
         email: "",
         phone: "",
       })
@@ -337,13 +336,25 @@ export function QuickCreateForms() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="customer-name">Full Name</Label>
+                <Label htmlFor="customer-first-name">First Name</Label>
                 <Input
-                  id="customer-name"
-                  name="name"
-                  value={customerForm.name}
+                  id="customer-first-name"
+                  name="firstName"
+                  value={customerForm.firstName}
                   onChange={handleCustomerChange}
-                  placeholder="John Doe"
+                  placeholder="John"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="customer-last-name">Last Name</Label>
+                <Input
+                  id="customer-last-name"
+                  name="last_name"
+                  value={customerForm.last_name}
+                  onChange={handleCustomerChange}
+                  placeholder="Doe"
                   required
                 />
               </div>

@@ -383,20 +383,20 @@ function AdminDashboardContent() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead>First Name</TableHead>
+                    <TableHead>Last Name</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Orders</TableHead>
-                    <TableHead>Spent</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {customers.slice(0, 5).map((customer) => (
                     <TableRow key={customer.id}>
-                      <TableCell className="font-medium">{customer.name}</TableCell>
+                      <TableCell className="font-medium">{customer.first_name}</TableCell>
+                      <TableCell>{customer.last_name}</TableCell>
                       <TableCell>{customer.email}</TableCell>
-                      <TableCell>{customer.totalOrders}</TableCell>
-                      <TableCell>${customer.totalSpent.toFixed(2)}</TableCell>
+                      <TableCell>{customer.phone}</TableCell>
                       <TableCell className="text-right">
                         <Link href={`/admin/customers/${customer.id}`}>
                           <Button variant="ghost" size="sm">

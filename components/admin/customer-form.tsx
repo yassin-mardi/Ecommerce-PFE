@@ -1,21 +1,27 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2 } from "lucide-react"
+import { Loader2, Plus, Trash } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useData, type Customer } from "@/components/admin/data-provider"
+import { useData, type Customer, type Address } from "@/components/admin/data-provider"
 
 interface CustomerFormProps {
   initialData?: Customer
   isEditing?: boolean
+}
+
+const emptyAddress: Address = {
+  id: "",
+  street: "",
+  city: "",
+  postalCode: "",
+  country: ""
 }
 
 export default function CustomerForm({ initialData, isEditing = false }: CustomerFormProps) {
@@ -23,16 +29,11 @@ export default function CustomerForm({ initialData, isEditing = false }: Custome
   const { addCustomer, updateCustomer } = useData()
 
   const [formData, setFormData] = useState({
-    name: initialData?.name || "",
+    firstName: initialData?.firstName || "",
+    lastName: initialData?.lastName || "",
     email: initialData?.email || "",
     phone: initialData?.phone || "",
-    address: initialData?.address || "",
-    city: initialData?.city || "",
-    state: initialData?.state || "",
-    zipCode: initialData?.zipCode || "",
-    country: initialData?.country || "USA",
-    totalOrders: initialData?.totalOrders || 0,
-    totalSpent: initialData?.totalSpent || 0,
+    adresses: initialData?.adresses || [{ ...emptyAddress }]
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -43,8 +44,29 @@ export default function CustomerForm({ initialData, isEditing = false }: Custome
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }))
+  const handleAddressChange = (index: number, field: keyof Address, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      adresses: prev.adresses.map((addr, i) => 
+        i === index ? { ...addr, [field]: value } : addr
+      )
+    }))
+  }
+
+  const handleAddAddress = () => {
+    setFormData((prev) => ({
+      ...prev,
+      adresses: [...prev.adresses, { ...emptyAddress }]
+    }))
+  }
+
+  const handleRemoveAddress = (index: number) => {
+    if (formData.adresses.length > 1) {
+      setFormData((prev) => ({
+        ...prev,
+        adresses: prev.adresses.filter((_, i) => i !== index)
+      }))
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,16 +78,7 @@ export default function CustomerForm({ initialData, isEditing = false }: Custome
       if (isEditing && initialData) {
         await updateCustomer(initialData.id, formData)
       } else {
-        await addCustomer({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
-          country: formData.country,
-        })
+        await addCustomer(formData)
       }
       router.push("/admin/customers")
     } catch (error) {
@@ -75,63 +88,6 @@ export default function CustomerForm({ initialData, isEditing = false }: Custome
       setIsSubmitting(false)
     }
   }
-
-  // US states for dropdown
-  const states = [
-    "AL",
-    "AK",
-    "AZ",
-    "AR",
-    "CA",
-    "CO",
-    "CT",
-    "DE",
-    "FL",
-    "GA",
-    "HI",
-    "ID",
-    "IL",
-    "IN",
-    "IA",
-    "KS",
-    "KY",
-    "LA",
-    "ME",
-    "MD",
-    "MA",
-    "MI",
-    "MN",
-    "MS",
-    "MO",
-    "MT",
-    "NE",
-    "NV",
-    "NH",
-    "NJ",
-    "NM",
-    "NY",
-    "NC",
-    "ND",
-    "OH",
-    "OK",
-    "OR",
-    "PA",
-    "RI",
-    "SC",
-    "SD",
-    "TN",
-    "TX",
-    "UT",
-    "VT",
-    "VA",
-    "WA",
-    "WV",
-    "WI",
-    "WY",
-  ]
-
-  // Countries for dropdown
-  const countries = ["USA", "Canada", "UK", "Australia", "Germany", "France", "Japan", "China", "India", "Brazil"]
 
   return (
     <form onSubmit={handleSubmit}>
@@ -147,13 +103,25 @@ export default function CustomerForm({ initialData, isEditing = false }: Custome
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="firstName">First Name</Label>
               <Input
-                id="name"
-                name="name"
-                value={formData.name}
+                id="firstName"
+                name="firstName"
+                value={formData.firstName}
                 onChange={handleChange}
-                placeholder="John Doe"
+                placeholder="John"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                id="lastName"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                placeholder="Doe"
                 required
               />
             </div>
@@ -179,94 +147,79 @@ export default function CustomerForm({ initialData, isEditing = false }: Custome
                 value={formData.phone}
                 onChange={handleChange}
                 placeholder="555-123-4567"
+                required
               />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                placeholder="123 Main St"
-              />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Addresses</Label>
+              <Button type="button" variant="outline" size="sm" onClick={handleAddAddress}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Address
+              </Button>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
-              <Input id="city" name="city" value={formData.city} onChange={handleChange} placeholder="New York" />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="state">State</Label>
-              <Select name="state" value={formData.state} onValueChange={(value) => handleSelectChange("state", value)}>
-                <SelectTrigger id="state">
-                  <SelectValue placeholder="Select state" />
-                </SelectTrigger>
-                <SelectContent>
-                  {states.map((state) => (
-                    <SelectItem key={state} value={state}>
-                      {state}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="zipCode">ZIP Code</Label>
-              <Input id="zipCode" name="zipCode" value={formData.zipCode} onChange={handleChange} placeholder="10001" />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
-              <Select
-                name="country"
-                value={formData.country}
-                onValueChange={(value) => handleSelectChange("country", value)}
-              >
-                <SelectTrigger id="country">
-                  <SelectValue placeholder="Select country" />
-                </SelectTrigger>
-                <SelectContent>
-                  {countries.map((country) => (
-                    <SelectItem key={country} value={country}>
-                      {country}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {isEditing && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="totalOrders">Total Orders</Label>
-                  <Input
-                    id="totalOrders"
-                    name="totalOrders"
-                    type="number"
-                    value={formData.totalOrders}
-                    onChange={(e) => handleSelectChange("totalOrders", e.target.value)}
-                    disabled={!isEditing}
-                  />
+            {formData.adresses.map((address, index) => (
+              <div key={index} className="space-y-4 p-4 border rounded-lg">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-medium">Address {index + 1}</h4>
+                  {formData.adresses.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveAddress(index)}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="totalSpent">Total Spent ($)</Label>
-                  <Input
-                    id="totalSpent"
-                    name="totalSpent"
-                    type="number"
-                    step="0.01"
-                    value={formData.totalSpent}
-                    onChange={(e) => handleSelectChange("totalSpent", e.target.value)}
-                    disabled={!isEditing}
-                  />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Street</Label>
+                    <Input
+                      value={address.street}
+                      onChange={(e) => handleAddressChange(index, 'street', e.target.value)}
+                      placeholder="123 Main St"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>City</Label>
+                    <Input
+                      value={address.city}
+                      onChange={(e) => handleAddressChange(index, 'city', e.target.value)}
+                      placeholder="New York"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Postal Code</Label>
+                    <Input
+                      value={address.postalCode}
+                      onChange={(e) => handleAddressChange(index, 'postalCode', e.target.value)}
+                      placeholder="10001"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Country</Label>
+                    <Input
+                      value={address.country}
+                      onChange={(e) => handleAddressChange(index, 'country', e.target.value)}
+                      placeholder="USA"
+                      required
+                    />
+                  </div>
                 </div>
-              </>
-            )}
+              </div>
+            ))}
           </div>
         </CardContent>
         <CardFooter className="flex justify-between">
